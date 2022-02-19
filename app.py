@@ -75,5 +75,9 @@ def guesses():
     total = results[breed_tags].sum(axis=1).values[:, None]
     results[breed_tags] = results[breed_tags] / total * 100
 
+    # Get the unique breed ideas
+    breed_ideas = set(results['newbreed'])
+
     # Print the form
-    return render_template('guesses.html', results=results.to_dict(orient='records'), breeds=breeds)
+    return render_template('guesses.html', results=results.to_dict(orient='records'), breeds=breeds,
+                           breed_ideas=breed_ideas)
