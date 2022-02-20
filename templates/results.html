@@ -18,6 +18,23 @@
 <main role="main" class="container">
     <h1 class="mt-5">The Daisy Game Winners!</h1>
 
+    <h2>The Answers</h2>
+
+    What you've all been waiting for...
+
+    <table class="table table-striped">
+        <thead>
+            <th scope="col">Breed</th>
+            <th scope="col">Percentage</th>
+        </thead>
+        {% for breed, amount in answer.items() %}
+        <tr>
+            <th scope="row">{{breed}}</th>
+            <td>{{"%.1f" | format(amount)}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
     <h2>The Main Game!</h2>
 
     Who are the winners!
