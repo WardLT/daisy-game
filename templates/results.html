@@ -47,6 +47,7 @@
             <th scope="col">Name</th>
             <th scope="col">Match Score</th>
             <th scope="col">Breed Score</th>
+            <th scope="col">Misses</th>
             <th scope="col">Award</th>
         </tr>
         </thead>
@@ -55,6 +56,7 @@
             <th scope="row">{{record['name']}}</th>
             <td>{{'%.2f' | format(record['kl_score'])}}</td>
             <td>{{record['breed_id']}}</td>
+            <td>{{record['misses']}}</td>
             <td>{{record['award']}}</td>
         </tr>
         {% endfor %}

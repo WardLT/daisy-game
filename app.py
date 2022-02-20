@@ -131,21 +131,25 @@ def display_results():
 
     # Compute the number of correct breeds
     results['breed_id'] = 0
+    results['misses'] = 0
     for breed, col in zip(breeds, breed_tags):
         if breed in answer:
             results['breed_id'] += results[col] > 0
         else:
+            results['misses'] += results[col] > 0
             results['breed_id'] -= results[col] > 0
 
     # Mark the champions!
-    results['grand_champ'] = results['kl_score'] == results['kl_score'].min()
-    results['coward_champ'] = results['breed_id'] == results['breed_id'].max()
+    results['grand_champ'] = np.isclose(results['kl_score'], results['kl_score'].min())
+    results['coward_champ'] = np.isclose(results['breed_id'], results['breed_id'].max())
+    results['cat_lover'] = np.isclose(results['misses'], results['misses'].max())
     results['both'] = results[['grand_champ', 'coward_champ']].all(axis=1)
 
     # Store the results
     results['award'] = ''
-    results.loc[results['grand_champ'], 'award'] = 'Grand Champion! 💪'
-    results.loc[results['coward_champ'], 'award'] = 'Coward Champ 👑'
+    results.loc[results['grand_champ'], 'award'] += 'Grand Champion! 💪'
+    results.loc[results['coward_champ'], 'award'] += 'Coward Champ 👑'
+    results.loc[results['cat_lover'], 'award'] += 'Most misses 😼'
     results.loc[results['both'], 'award'] = 'Ultimate Champ!! 👑💪🐶'
 
     # Sort values so that the KL champ is on top
