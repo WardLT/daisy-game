@@ -3,6 +3,7 @@ from math import isclose
 import secrets
 import json
 
+import humanize.time
 from flask import Flask, request, render_template, flash, session
 from werkzeug.utils import redirect
 import pandas as pd
@@ -48,7 +49,7 @@ answer = {
 assert isclose(sum(answer.values()), 100)
 assert all(k in breeds for k in answer)
 
-result_time = datetime(2022, 2, 20, 8, 0, 0)
+result_time = datetime(2022, 2, 20, 20, 0, 0)
 
 
 @app.route('/', methods=['GET'])
@@ -109,13 +110,17 @@ def get_results() -> pd.DataFrame:
 
 @app.route('/results')
 def display_results():
+    if datetime.now() < result_time:
+        flash(f'You have to wait until {humanize.time.naturaltime(result_time)}!', 'error')
+        return redirect('/guesses')
+
     # Get the results
     results = get_results()
 
     # Compute the KL score (contest 1)
     results['kl_score'] = 0.
     for breed, col in zip(breeds, breed_tags):
-        results['kl_score'] += np.abs(results['tag'] - answer[breed])
+        results['kl_score'] += np.abs(results[col] - answer.get(breed, 0))
 
     # Compute the number of correct breeds
     results['breed_id'] = 0
@@ -128,11 +133,17 @@ def display_results():
     # Mark the champions!
     results['grand_champ'] = results['kl_score'] == results['kl_score'].min()
     results['coward_champ'] = results['breed_id'] == results['breed_id'].max()
+    results['both'] = results[['grand_champ', 'coward_champ']].all(axis=1)
 
     # Store the results
     results['award'] = ''
-    results[results['grand_champ']]['award'] += 'Grand Champion! 💪'
-    results[results['coward_champ']]['award'] += 'Coward Champ 👑'
+    results.loc[results['grand_champ'], 'award'] = 'Grand Champion! 💪'
+    results.loc[results['coward_champ'], 'award'] = 'Coward Champ 👑'
+    results.loc[results['both'], 'award'] = 'Ultimate Champ!! 👑💪🐶'
+
+    # Sort values so that the KL champ is on top
+    results.sort_values('kl_score', ascending=True, inplace=True)
 
     # Return the results
-    return render_template('results.html', results=results.to_dict('records'))
+    breed_ideas = set(results['newbreed'])
+    return render_template('results.html', results=results.to_dict('records'), breed_ideas=breed_ideas)
