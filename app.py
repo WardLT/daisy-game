@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 from math import isclose
 import secrets
@@ -49,7 +50,7 @@ answer = {
 assert isclose(sum(answer.values()), 100)
 assert all(k in breeds for k in answer)
 
-result_time = datetime(2022, 2, 20, 20, 0, 0)
+result_time = datetime(2022, 2, 20, 19, 30, 0)
 
 
 @app.route('/', methods=['GET'])
@@ -59,6 +60,11 @@ def home():
 
 @app.route('/', methods=['POST'])
 def receive():
+    # Check if it is too late
+    if datetime.now() > result_time:
+        flash("It's too late now!", 'error')
+        return redirect('/guesses')
+
     # Store the response time
     data = dict(request.form)
     data['response_time'] = datetime.now().isoformat()
@@ -85,6 +91,7 @@ def receive():
 
 @app.route('/guesses')
 def guesses():
+    # Get the results
     results = get_results()
 
     # Get the unique breed ideas
@@ -92,7 +99,7 @@ def guesses():
 
     # Print the form
     return render_template('guesses.html', results=results.to_dict(orient='records'), breeds=breeds,
-                           breed_ideas=breed_ideas)
+                           breed_ideas=breed_ideas, answer=answer, done=datetime.now() > result_time)
 
 
 def get_results() -> pd.DataFrame:
@@ -146,4 +153,4 @@ def display_results():
 
     # Return the results
     breed_ideas = set(results['newbreed'])
-    return render_template('results.html', results=results.to_dict('records'), breed_ideas=breed_ideas)
+    return render_template('results.html', results=results.to_dict('records'), breed_ideas=breed_ideas, answer=answer)

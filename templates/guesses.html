@@ -35,7 +35,7 @@
 
     <p>What heritages were guessed?</p>
 
-    <table class="table table-striped">
+    <table class="table table-striped text-center">
         <thead>
         <tr>
             <th scope="col">Name</th>
@@ -49,10 +49,14 @@
             <th scope="row">{{record['name']}}</th>
             {% for breed in breeds %}
             {% set val = record[breed | replace(" ", "_")] %}
-            {% if val < 1e-6 %}
-            <td></td>
-            {% else %}
+            {% if val > 1e-6 %}
+                {% if done %}
+            <td class="{{ 'table-success' if breed in answer else 'table-danger'}}">{{ "%.1f" | format(val) }}</td>
+                {% else %}
             <td>{{ "%.1f" | format(val) }}</td>
+                {% endif %}
+            {% else %}
+            <td></td>
             {% endif %}
             {% endfor %}
         </tr>
