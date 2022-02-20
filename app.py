@@ -1,10 +1,12 @@
 from datetime import datetime
+from math import isclose
 import secrets
 import json
 
 from flask import Flask, request, render_template, flash, session
 from werkzeug.utils import redirect
 import pandas as pd
+import numpy as np
 
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(16)
@@ -12,18 +14,20 @@ app.secret_key = secrets.token_urlsafe(16)
 breeds = [
     "Airedale Terrier",
     "American Eskimo Dog",
+    "American Foxhound",
+    "American Pit Bull Terrier",
     "Australian Shepherd",
     "Australian Stumpy-tail Cattle Dog",
     "Beagle",
     "Belgian Turvuren",
     "Bernese Mountain Dog",
-    "Birman",
     "Bulldog",
     "Caucasian Shepherd Dog",
     "Chow",
     "Collie",
     "German Long-haired Pointer",
     "German Shepherd",
+    "Golden Retriever",
     "Havana Brown",
     "King Charles Spaniel",
     "Nova Scotia Duck Toller Retriever",
@@ -31,6 +35,20 @@ breeds = [
 ]
 
 breed_tags = [x.replace(" ", "_") for x in breeds]
+
+answer = {
+    "Beagle": 35.9,
+    "American Pit Bull Terrier": 20.5,
+    "Chow": 14.4,
+    "American Foxhound": 14.1,
+    "Golden Retriever": 8,
+    "German Shepherd": 7.1
+}
+
+assert isclose(sum(answer.values()), 100)
+assert all(k in breeds for k in answer)
+
+result_time = datetime(2022, 2, 20, 8, 0, 0)
 
 
 @app.route('/', methods=['GET'])
@@ -66,6 +84,18 @@ def receive():
 
 @app.route('/guesses')
 def guesses():
+    results = get_results()
+
+    # Get the unique breed ideas
+    breed_ideas = set(results['newbreed'])
+
+    # Print the form
+    return render_template('guesses.html', results=results.to_dict(orient='records'), breeds=breeds,
+                           breed_ideas=breed_ideas)
+
+
+def get_results() -> pd.DataFrame:
+    """Get the latest guesses from contestants"""
     # Get the most-recent guess from each person
     results = pd.read_json('results.json', lines=True)
     results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
@@ -74,10 +104,35 @@ def guesses():
     # Compute percentages
     total = results[breed_tags].sum(axis=1).values[:, None]
     results[breed_tags] = results[breed_tags] / total * 100
+    return results
 
-    # Get the unique breed ideas
-    breed_ideas = set(results['newbreed'])
 
-    # Print the form
-    return render_template('guesses.html', results=results.to_dict(orient='records'), breeds=breeds,
-                           breed_ideas=breed_ideas)
+@app.route('/results')
+def display_results():
+    # Get the results
+    results = get_results()
+
+    # Compute the KL score (contest 1)
+    results['kl_score'] = 0.
+    for breed, col in zip(breeds, breed_tags):
+        results['kl_score'] += np.abs(results['tag'] - answer[breed])
+
+    # Compute the number of correct breeds
+    results['breed_id'] = 0
+    for breed, col in zip(breeds, breed_tags):
+        if breed in answer:
+            results['breed_id'] += results[col] > 0
+        else:
+            results['breed_id'] -= results[col] > 0
+
+    # Mark the champions!
+    results['grand_champ'] = results['kl_score'] == results['kl_score'].min()
+    results['coward_champ'] = results['breed_id'] == results['breed_id'].max()
+
+    # Store the results
+    results['award'] = ''
+    results[results['grand_champ']]['award'] += 'Grand Champion! 💪'
+    results[results['coward_champ']]['award'] += 'Coward Champ 👑'
+
+    # Return the results
+    return render_template('results.html', results=results.to_dict('records'))

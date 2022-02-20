@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>The Daisy Game</title>
+
+    <!-- Bootstrap core CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+
+</head>
+
+<body>
+
+<!-- Begin page content -->
+<main role="main" class="container">
+    <h1 class="mt-5">The Daisy Game Results!</h1>
+
+    <a class="btn btn-primary" href="/" role="button">Change your guesses</a>
+
+    <h2>The Game!</h2>
+
+    <p>What heritages were guessed?</p>
+
+    <table class="table table-striped">
+        <thead>
+        <tr>
+            <th scope="col">Name</th>
+            {% for breed in breeds %}
+            <th scope="col">{{breed}}</th>
+            {% endfor %}
+        </tr>
+        </thead>
+        {% for record in results %}
+        <tr>
+            <th scope="row">{{record['name']}}</th>
+            {% for breed in breeds %}
+            {% set val = record[breed | replace(" ", "_")] %}
+            {% if val < 1e-6 %}
+            <td></td>
+            {% else %}
+            <td>{{ "%.1f" | format(val) }}</td>
+            {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>New Breed Names</h2>
+
+    <p>Any clever names for Daisy's actual breed?</p>
+
+    <table class="table">
+        {% for breed in breed_ideas %}
+        <tr>
+            <th scope="row">{{breed}}</th>
+        </tr>
+        {% endfor %}
+    </table>
+</main>
+</body>
+</html>
