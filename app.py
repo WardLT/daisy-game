@@ -222,4 +222,7 @@ def upload_answers():
         # If it does read correctly, replace the existing answers
         shutil.move(tmp_path, answer_path)
         flash('Answer list uploaded correctly')
+
+        # Clear the cache for the answer loader
+        get_answer.cache_clear()
         return redirect('/')
