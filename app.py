@@ -50,7 +50,7 @@ answer = {
 assert isclose(sum(answer.values()), 100)
 assert all(k in breeds for k in answer)
 
-result_time = datetime(2022, 2, 20, 19, 30, 0)
+result_time = datetime(2022, 2, 20, 12, 30, 0)
 
 
 @app.route('/', methods=['GET'])
@@ -83,7 +83,7 @@ def receive():
         flash('You must assign a percentage to at least one breed!', 'error')
         return redirect('/')
 
-    with open('results.json', 'a') as fp:
+    with open('daisy-results.json', 'a') as fp:
         print(json.dumps(data), file=fp)
 
     return redirect('/guesses')
@@ -105,7 +105,7 @@ def guesses():
 def get_results() -> pd.DataFrame:
     """Get the latest guesses from contestants"""
     # Get the most-recent guess from each person
-    results = pd.read_json('results.json', lines=True)
+    results = pd.read_json('daisy-results.json', lines=True)
     results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
     results.drop_duplicates('name', inplace=True)
 
