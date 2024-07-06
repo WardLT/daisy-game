@@ -10,7 +10,7 @@ import shutil
 import json
 
 import humanize.time
-from flask import Flask, request, render_template, flash, session, send_file
+from flask import Flask, request, render_template, flash, session, send_file, url_for
 from flask_basicauth import BasicAuth
 from werkzeug.utils import redirect
 import pandas as pd
@@ -22,7 +22,6 @@ app.secret_key = secrets.token_urlsafe(16)
 
 app.config['BASIC_AUTH_USERNAME'] = 'admin'
 app.config['BASIC_AUTH_PASSWORD'] = os.environ.get('DOLLYGAME_PASSWD', 'admin')
-
 basic_auth = BasicAuth(app)
 
 # Randomize the name of the answer download and upload page
@@ -52,6 +51,7 @@ def get_answer(path: Path = answer_path) -> pd.DataFrame():
 
     return answers
 
+
 @app.route('/', methods=['GET'])
 def home():
     breeds = get_answer()['breed'].tolist()
@@ -65,7 +65,7 @@ def receive():
     # Check if it is too late
     if datetime.now() > result_time:
         flash("It's too late now!", 'error')
-        return redirect('/guesses')
+        return redirect(url_for('/guesses'))
 
     # Store the response time
     data = dict(request.form)
@@ -87,12 +87,12 @@ def receive():
     score_count = sum(data.get(x, 0) for x in answers['breed_tag'])
     if score_count <= 0:
         flash('You must assign a percentage to at least one breed!', 'error')
-        return redirect('/')
+        return redirect(url_for('/'))
 
     with open('results.json', 'a') as fp:
         print(json.dumps(data), file=fp)
 
-    return redirect('/guesses')
+    return redirect(url_for('/guesses'))
 
 
 @app.route('/guesses')
@@ -136,7 +136,7 @@ def get_results() -> Optional[pd.DataFrame]:
 def display_results():
     if datetime.now() < result_time:
         flash(f'You have to wait until {humanize.time.naturaltime(result_time)}!', 'error')
-        return redirect('/guesses')
+        return redictory(('/guesses'))
 
     # Get the answer
     answer_data = get_answer()
@@ -199,14 +199,13 @@ def upload_answers():
     """Receive the uploaded answers"""
 
     # Make sure a file was provided
-    print(request.files)
     if 'file' not in request.files:
         flash('You did not provide a file', category='error')
-        return redirect('/admin')
+        return redirect(url_for('admin'))
     file = request.files['file']
     if file.filename == '':
         flash('You did not provide a file', category='error')
-        return redirect('/admin')
+        return redirect(url_for('admin'))
 
     # Download and make sure it is formatted correctly
     with TemporaryDirectory() as tmp:
@@ -217,7 +216,7 @@ def upload_answers():
             get_answer(tmp_path)
         except ValueError as err:
             flash(str(err), category='error')
-            return redirect('/admin')
+            return redirect(url_for('admin'))
 
         # If it does read correctly, replace the existing answers
         shutil.move(tmp_path, answer_path)
@@ -225,4 +224,4 @@ def upload_answers():
 
         # Clear the cache for the answer loader
         get_answer.cache_clear()
-        return redirect('/')
+        return redirect(url_for('/'))

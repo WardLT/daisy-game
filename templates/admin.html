@@ -31,9 +31,9 @@
     <p>Thank you, Nick and Kati, for GMing the Dolly Game. This is your page for uploading answers in a way
     that makes it inconvenient for any of the players, Logan included, to see them.</p>
 
-    <p><a class="btn-sm btn-primary" href="/{{download_page}}" role="button" download>Download Template</a></p>
+    <p><a class="btn-sm btn-primary" href="{{url_for('download_answers')}}" role="button" download>Download Template</a></p>
 
-    <form class="row gy-2 gx-3 align-items-center" action="/admin" method="post" enctype=multipart/form-data>
+    <form class="row gy-2 gx-3 align-items-center" action="" method="post" enctype=multipart/form-data>
         <p><input type="file" id="file" name="file" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/></p>
 
         <p><input type="submit" class="btn btn-primary mb-3">Submit</input></p>
