@@ -1,0 +1,4 @@
+flask
+pandas>2
+humanize
+flask-basicauth
