@@ -52,7 +52,6 @@ def get_answer(path: Path = answer_path) -> pd.DataFrame():
 
     return answers
 
-
 @app.route('/', methods=['GET'])
 def home():
     breeds = get_answer()['breed'].tolist()
@@ -73,8 +72,12 @@ def receive():
     data['response_time'] = datetime.now().isoformat()
 
     # Convert breeds to percentages
+    data['name'] = data['name'].strip()
     for b in answers['breed_tag']:
-        data[b] = float(data.get(b, 0))
+        val = data.get(b, '0').strip()
+        if len(val) < 1:
+            val = 0
+        data[b] = float(val)
 
     # Store the person's name in the session
     session['name'] = data['name']
@@ -121,7 +124,7 @@ def get_results() -> Optional[pd.DataFrame]:
     # Get the most-recent guess from each person
     results = pd.read_json('results.json', lines=True)
     results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
-    results.drop_duplicates('name', inplace=True)
+    results.drop_duplicates('name', keep='first', inplace=True)
 
     # Compute percentages
     total = results[breed_tags].sum(axis=1).values[:, None]
