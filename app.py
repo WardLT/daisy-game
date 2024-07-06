@@ -65,7 +65,7 @@ def receive():
     # Check if it is too late
     if datetime.now() > result_time:
         flash("It's too late now!", 'error')
-        return redirect(url_for('/guesses'))
+        return redirect(url_for('guesses'))
 
     # Store the response time
     data = dict(request.form)
@@ -87,12 +87,12 @@ def receive():
     score_count = sum(data.get(x, 0) for x in answers['breed_tag'])
     if score_count <= 0:
         flash('You must assign a percentage to at least one breed!', 'error')
-        return redirect(url_for('/'))
+        return redirect(url_for('home'))
 
     with open('results.json', 'a') as fp:
         print(json.dumps(data), file=fp)
 
-    return redirect(url_for('/guesses'))
+    return redirect(url_for('guesses'))
 
 
 @app.route('/guesses')
@@ -224,4 +224,4 @@ def upload_answers():
 
         # Clear the cache for the answer loader
         get_answer.cache_clear()
-        return redirect(url_for('/'))
+        return redirect(url_for('home'))
