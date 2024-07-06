@@ -13,6 +13,17 @@
 <!-- Begin page content -->
 <main role="main" class="container">
     <h1 class="mt-5">The Dolly Game</h1>
+
+    {% with messages = get_flashed_messages(category_filter="message") %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-primary" role="alert">
+        {{message}}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
     <p class="lead">Embark was able to catch the breed(s) of all of Dolly’s ancestors, determining a fraction of Dolly’s
         heritage to each breed. Your task is to guess what those breeds are. Assign a percentage below to guess what
         breeds Dolly is a perfect mix of.</p>

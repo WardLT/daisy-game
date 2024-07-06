@@ -1,20 +1,32 @@
+import os
 from datetime import datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Optional
 from functools import cache
 from math import isclose
 import secrets
+import shutil
 import json
 
-
 import humanize.time
-from flask import Flask, request, render_template, flash, session
+from flask import Flask, request, render_template, flash, session, send_file
+from flask_basicauth import BasicAuth
 from werkzeug.utils import redirect
 import pandas as pd
 import numpy as np
 
+# Make the flask app, including a password for the admin page
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(16)
+
+app.config['BASIC_AUTH_USERNAME'] = 'admin'
+app.config['BASIC_AUTH_PASSWORD'] = os.environ.get('DOLLYGAME_PASSWD', 'admin')
+
+basic_auth = BasicAuth(app)
+
+# Randomize the name of the answer download and upload page
+download_page = secrets.token_urlsafe(16) + '.xlsx'
 
 result_time = datetime(2022, 2, 20, 12, 30, 0)
 
@@ -35,7 +47,8 @@ def get_answer(path: Path = answer_path) -> pd.DataFrame():
 
     # Make the fractions add to 100
     answers['fraction'] *= 100
-    assert isclose(answers['fraction'].sum(), 100)
+    if not isclose(answers['fraction'].sum(), 100):
+        raise ValueError(f'The fraction of breeds does not batch up to the correct format')
 
     return answers
 
@@ -48,7 +61,6 @@ def home():
 
 @app.route('/', methods=['POST'])
 def receive():
-
     answers = get_answer()
 
     # Check if it is too late
@@ -100,9 +112,11 @@ def guesses():
 
 def get_results() -> Optional[pd.DataFrame]:
     """Get the latest guesses from contestants"""
-
     if not Path('results.json').exists():
         return None
+
+    # Get the breed tags
+    breed_tags = get_answer()['breed_tag'].values
 
     # Get the most-recent guess from each person
     results = pd.read_json('results.json', lines=True)
@@ -121,23 +135,27 @@ def display_results():
         flash(f'You have to wait until {humanize.time.naturaltime(result_time)}!', 'error')
         return redirect('/guesses')
 
+    # Get the answer
+    answer_data = get_answer()
+    answer = dict(zip(answer_data['breed_tag'], answer_data['fraction']))
+
     # Get the results
     results = get_results()
 
     # Compute the KL score (contest 1)
     results['kl_score'] = 0.
-    for breed, col in zip(breeds, breed_tags):
-        results['kl_score'] += np.abs(results[col] - answer.get(breed, 0))
+    for breed, amount in answer.items():
+        results['kl_score'] += np.abs(results[breed] - amount)
 
     # Compute the number of correct breeds
     results['breed_id'] = 0
     results['misses'] = 0
-    for breed, col in zip(breeds, breed_tags):
-        if breed in answer:
-            results['breed_id'] += results[col] > 0
+    for breed, amount in answer.items():
+        if amount > 0:
+            results['breed_id'] += results[breed] > 0
         else:
-            results['misses'] += results[col] > 0
-            results['breed_id'] -= results[col] > 0
+            results['misses'] += results[breed] > 0
+            results['breed_id'] -= results[breed] > 0
 
     # Mark the champions!
     results['grand_champ'] = np.isclose(results['kl_score'], results['kl_score'].min())
@@ -158,3 +176,47 @@ def display_results():
     # Return the results
     breed_ideas = set(results['newbreed'])
     return render_template('results.html', results=results.to_dict('records'), breed_ideas=breed_ideas, answer=answer)
+
+
+@app.get('/admin')
+@basic_auth.required
+def admin():
+    """Display the admin page"""
+    return render_template('admin.html', download_page=download_page)
+
+
+@app.get(f'/{download_page}')
+@basic_auth.required
+def download_answers():
+    return send_file(answer_path, as_attachment=True, download_name=answer_path.name)
+
+
+@app.post('/admin')
+def upload_answers():
+    """Receive the uploaded answers"""
+
+    # Make sure a file was provided
+    print(request.files)
+    if 'file' not in request.files:
+        flash('You did not provide a file', category='error')
+        return redirect('/admin')
+    file = request.files['file']
+    if file.filename == '':
+        flash('You did not provide a file', category='error')
+        return redirect('/admin')
+
+    # Download and make sure it is formatted correctly
+    with TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp) / 'answers.xlsx'
+        file.save(tmp_path)
+
+        try:
+            get_answer(tmp_path)
+        except ValueError as err:
+            flash(str(err), category='error')
+            return redirect('/admin')
+
+        # If it does read correctly, replace the existing answers
+        shutil.move(tmp_path, answer_path)
+        flash('Answer list uploaded correctly')
+        return redirect('/')
