@@ -1,8 +1,11 @@
-from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from functools import cache
 from math import isclose
 import secrets
 import json
+
 
 import humanize.time
 from flask import Flask, request, render_template, flash, session
@@ -13,53 +16,41 @@ import numpy as np
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(16)
 
-breeds = [
-    "Airedale Terrier",
-    "American Eskimo Dog",
-    "American Foxhound",
-    "American Pit Bull Terrier",
-    "Australian Shepherd",
-    "Australian Stumpy-tail Cattle Dog",
-    "Beagle",
-    "Belgian Turvuren",
-    "Bernese Mountain Dog",
-    "Bulldog",
-    "Caucasian Shepherd Dog",
-    "Chow",
-    "Collie",
-    "German Long-haired Pointer",
-    "German Shepherd",
-    "Golden Retriever",
-    "Havana Brown",
-    "King Charles Spaniel",
-    "Nova Scotia Duck Toller Retriever",
-    "Rottweiler"
-]
-
-breed_tags = [x.replace(" ", "_") for x in breeds]
-
-answer = {
-    "Beagle": 35.9,
-    "American Pit Bull Terrier": 20.5,
-    "Chow": 14.4,
-    "American Foxhound": 14.1,
-    "Golden Retriever": 8,
-    "German Shepherd": 7.1
-}
-
-assert isclose(sum(answer.values()), 100)
-assert all(k in breeds for k in answer)
-
 result_time = datetime(2022, 2, 20, 12, 30, 0)
+
+answer_path = Path('answers.xlsx')
+result_path = Path('results.json')
+
+
+@cache
+def get_answer(path: Path = answer_path) -> pd.DataFrame():
+    """Load the answer spreadsheet from disk
+
+    Adds a breed tag column which
+    """
+    answers = pd.read_excel(path, usecols=range(3))
+
+    # Make breed tags
+    answers['breed_tag'] = answers['breed'].apply(lambda x: x.replace(" ", "_").lower())
+
+    # Make the fractions add to 100
+    answers['fraction'] *= 100
+    assert isclose(answers['fraction'].sum(), 100)
+
+    return answers
 
 
 @app.route('/', methods=['GET'])
 def home():
+    breeds = get_answer()['breed'].tolist()
     return render_template('home.html', breeds=breeds)
 
 
 @app.route('/', methods=['POST'])
 def receive():
+
+    answers = get_answer()
+
     # Check if it is too late
     if datetime.now() > result_time:
         flash("It's too late now!", 'error')
@@ -70,7 +61,7 @@ def receive():
     data['response_time'] = datetime.now().isoformat()
 
     # Convert breeds to percentages
-    for b in breed_tags:
+    for b in answers['breed_tag']:
         data[b] = float(data.get(b, 0))
 
     # Store the person's name in the session
@@ -78,12 +69,12 @@ def receive():
     session['newbreed'] = data['newbreed']
 
     # Make sure they guess at least one breed
-    score_count = sum(data.get(x, 0) for x in breed_tags)
+    score_count = sum(data.get(x, 0) for x in answers['breed_tag'])
     if score_count <= 0:
         flash('You must assign a percentage to at least one breed!', 'error')
         return redirect('/')
 
-    with open('daisy-results.json', 'a') as fp:
+    with open('results.json', 'a') as fp:
         print(json.dumps(data), file=fp)
 
     return redirect('/guesses')
@@ -91,21 +82,30 @@ def receive():
 
 @app.route('/guesses')
 def guesses():
-    # Get the results
+    # Get the results and answers
     results = get_results()
+    answer = get_answer()
 
     # Get the unique breed ideas
-    breed_ideas = set(results['newbreed'])
+    breed_ideas = set(results['newbreed']) if results is not None else set()
 
     # Print the form
-    return render_template('guesses.html', results=results.to_dict(orient='records'), breeds=breeds,
-                           breed_ideas=breed_ideas, answer=answer, done=datetime.now() > result_time)
+    return render_template('guesses.html',
+                           results=None if results is None else results.to_dict(orient='records'),
+                           breeds=answer['breed'].tolist(),
+                           breed_ideas=breed_ideas,
+                           answer=answer,
+                           done=datetime.now() > result_time)
 
 
-def get_results() -> pd.DataFrame:
+def get_results() -> Optional[pd.DataFrame]:
     """Get the latest guesses from contestants"""
+
+    if not Path('results.json').exists():
+        return None
+
     # Get the most-recent guess from each person
-    results = pd.read_json('daisy-results.json', lines=True)
+    results = pd.read_json('results.json', lines=True)
     results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
     results.drop_duplicates('name', inplace=True)
 

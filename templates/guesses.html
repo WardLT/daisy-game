@@ -28,13 +28,18 @@
     {% endif %}
     {% endwith %}
 
-    <a class="btn btn-primary" href="/" role="button">Change your guesses</a>
-    <a class="btn btn-secondary" href="/results" role="button">See the results</a>
+    <p>
+        <a class="btn btn-primary" href="/" role="button">Change your guesses</a>
+        <a class="btn btn-secondary" href="/results" role="button">See the results</a>
+    </p>
 
     <h2>Breed Guesses</h2>
 
     <p>What heritages were guessed?</p>
 
+    {% if results is none %}
+    <p><b>No guesses yet!</b></p>
+    {% else %}
     <table class="table table-striped text-center">
         <thead>
         <tr>
@@ -62,6 +67,7 @@
         </tr>
         {% endfor %}
     </table>
+    {% endif %}
 
     <h2>New Breed Names</h2>
 
