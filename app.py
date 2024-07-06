@@ -29,12 +29,12 @@ download_page = secrets.token_urlsafe(16) + '.xlsx'
 
 result_time = datetime(2022, 2, 20, 12, 30, 0)
 
-answer_path = Path('answers.xlsx')
-result_path = Path('results.json')
+_answer_path = Path('answers.xlsx')
+_result_path = Path('results.json')
 
 
 @cache
-def get_answer(path: Path = answer_path) -> pd.DataFrame():
+def get_answer(path: Path = _answer_path) -> pd.DataFrame():
     """Load the answer spreadsheet from disk
 
     Adds a breed tag column which
@@ -50,6 +50,60 @@ def get_answer(path: Path = answer_path) -> pd.DataFrame():
         raise ValueError(f'The fraction of breeds does not batch up to the correct format')
 
     return answers
+
+
+def get_results(result_path: Path = _result_path,
+                answer_path: Path = _answer_path) -> Optional[pd.DataFrame]:
+    """Get the latest guesses from contestants"""
+    if not Path(result_path).exists():
+        return None
+
+    # Get the breed tags
+    answer_data = get_answer(answer_path)
+    answer = dict(zip(answer_data['breed_tag'], answer_data['fraction']))
+    breed_tags = answer_data['breed_tag'].values
+
+    # Get the most-recent guess from each person
+    results = pd.read_json(result_path, lines=True)
+    results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
+    results.drop_duplicates('name', keep='first', inplace=True)
+
+    # Compute percentages
+    total = results[breed_tags].sum(axis=1).values[:, None]
+    results[breed_tags] = results[breed_tags] / total * 100
+
+    # Compute the KL score (contest 1)
+    results['kl_score'] = 0.
+    for breed, amount in answer.items():
+        results['kl_score'] += np.abs(results[breed] - amount)
+
+    # Compute the number of correct breeds
+    results['breed_id'] = 0
+    results['misses'] = 0
+    for breed, amount in answer.items():
+        if amount > 0:
+            results['breed_id'] += results[breed] > 0
+        else:
+            results['misses'] += results[breed] > 0
+            results['breed_id'] -= results[breed] > 0
+
+    # Mark the champions!
+    results['grand_champ'] = np.isclose(results['kl_score'], results['kl_score'].min())
+    results['coward_champ'] = np.isclose(results['breed_id'], results['breed_id'].max())
+    results['cat_lover'] = np.isclose(results['misses'], results['misses'].max())
+    results['both'] = results[['grand_champ', 'coward_champ']].all(axis=1)
+
+    # Store the results
+    results['award'] = ''
+    results.loc[results['grand_champ'], 'award'] += 'Grand Champion! 💪'
+    results.loc[results['coward_champ'], 'award'] += 'Coward Champ 👑'
+    results.loc[results['cat_lover'], 'award'] += 'Most misses 😼'
+    results.loc[results['both'], 'award'] = 'Ultimate Champ!! 👑💪🐶'
+
+    # Sort values so that the KL champ is on top
+    results.sort_values('kl_score', ascending=True, inplace=True)
+
+    return results
 
 
 @app.route('/', methods=['GET'])
@@ -113,68 +167,14 @@ def guesses():
                            done=datetime.now() > result_time)
 
 
-def get_results() -> Optional[pd.DataFrame]:
-    """Get the latest guesses from contestants"""
-    if not Path('results.json').exists():
-        return None
-
-    # Get the breed tags
-    breed_tags = get_answer()['breed_tag'].values
-
-    # Get the most-recent guess from each person
-    results = pd.read_json('results.json', lines=True)
-    results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
-    results.drop_duplicates('name', keep='first', inplace=True)
-
-    # Compute percentages
-    total = results[breed_tags].sum(axis=1).values[:, None]
-    results[breed_tags] = results[breed_tags] / total * 100
-    return results
-
-
 @app.route('/results')
 def display_results():
     if datetime.now() < result_time:
         flash(f'You have to wait until {humanize.time.naturaltime(result_time)}!', 'error')
-        return redictory(('/guesses'))
-
-    # Get the answer
-    answer_data = get_answer()
-    answer = dict(zip(answer_data['breed_tag'], answer_data['fraction']))
+        return redirect(url_for('guesses'))
 
     # Get the results
     results = get_results()
-
-    # Compute the KL score (contest 1)
-    results['kl_score'] = 0.
-    for breed, amount in answer.items():
-        results['kl_score'] += np.abs(results[breed] - amount)
-
-    # Compute the number of correct breeds
-    results['breed_id'] = 0
-    results['misses'] = 0
-    for breed, amount in answer.items():
-        if amount > 0:
-            results['breed_id'] += results[breed] > 0
-        else:
-            results['misses'] += results[breed] > 0
-            results['breed_id'] -= results[breed] > 0
-
-    # Mark the champions!
-    results['grand_champ'] = np.isclose(results['kl_score'], results['kl_score'].min())
-    results['coward_champ'] = np.isclose(results['breed_id'], results['breed_id'].max())
-    results['cat_lover'] = np.isclose(results['misses'], results['misses'].max())
-    results['both'] = results[['grand_champ', 'coward_champ']].all(axis=1)
-
-    # Store the results
-    results['award'] = ''
-    results.loc[results['grand_champ'], 'award'] += 'Grand Champion! 💪'
-    results.loc[results['coward_champ'], 'award'] += 'Coward Champ 👑'
-    results.loc[results['cat_lover'], 'award'] += 'Most misses 😼'
-    results.loc[results['both'], 'award'] = 'Ultimate Champ!! 👑💪🐶'
-
-    # Sort values so that the KL champ is on top
-    results.sort_values('kl_score', ascending=True, inplace=True)
 
     # Return the results
     breed_ideas = set(results['newbreed'])
@@ -191,7 +191,7 @@ def admin():
 @app.get(f'/{download_page}')
 @basic_auth.required
 def download_answers():
-    return send_file(answer_path, as_attachment=True, download_name=answer_path.name)
+    return send_file(_answer_path, as_attachment=True, download_name=_answer_path.name)
 
 
 @app.post('/admin')
@@ -219,7 +219,7 @@ def upload_answers():
             return redirect(url_for('admin'))
 
         # If it does read correctly, replace the existing answers
-        shutil.move(tmp_path, answer_path)
+        shutil.move(tmp_path, _answer_path)
         flash('Answer list uploaded correctly')
 
         # Clear the cache for the answer loader
