@@ -41,6 +41,10 @@
 
     <p><a class="btn btn-primary" href="guesses" role="button">See everyone's guesses</a></p>
 
+    {% if done %}
+    <p><a class="btn btn-success" href="results" role="button">See the results!</a></p>
+    {% endif %}
+
     <h2>Helpful Material</h2>
 
     <p>In case may not have met Dolly yet, we've collected some

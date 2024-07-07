@@ -53,7 +53,7 @@ def test_load_results(perfect_answer):
 
 
 def test_submission_then_update(test_app, perfect_answer):
-    """Submit an answer then change"""
+    """Submit an answer then change it"""
     # Test loading the page
     page = test_app.get('/')
     assert page.status_code == 200
@@ -74,3 +74,33 @@ def test_submission_then_update(test_app, perfect_answer):
     page = test_app.post('/', data=perfect_answer, follow_redirects=True)
     assert page.status_code == 200
     assert 'A worse idea' in page.get_data(True)
+
+
+def test_too_late(test_app, perfect_answer):
+    app.result_time = datetime.now() - timedelta(minutes=1)
+
+    page = test_app.post('/', data=perfect_answer, follow_redirects=True)
+    assert 'too late' in page.get_data(True)
+
+    # Make sure the result isn't on the webpage
+    page = test_app.get('/guesses')
+    assert page.status_code == 200
+    assert 'Lady Perfect' not in page.get_data(True)
+
+
+def test_results(test_app, perfect_answer):
+    page = test_app.post('/', data=perfect_answer, follow_redirects=True)
+    assert page.status_code == 200
+    assert 'Lady Perfect' in page.get_data(True)
+
+    # Make sure the results are not yet visible
+    page = test_app.get('/results', follow_redirects=True)
+    assert page.status_code == 200
+    assert 'The Answers' not in page.get_data(True)
+    assert 'You have to wait' in page.get_data(True)
+
+    # Increment the time and see if the results button shows up
+    app.result_time = datetime.now() - timedelta(minutes=1)
+    page = test_app.get('/results')
+    assert page.status_code == 200
+    assert 'Ultimate Champ!' in page.get_data(True)

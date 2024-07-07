@@ -111,7 +111,7 @@ def get_results(result_path: Optional[Path] = None,
 @app.route('/', methods=['GET'])
 def home():
     breeds = get_answer()['breed'].tolist()
-    return render_template('home.html', breeds=breeds)
+    return render_template('home.html', breeds=breeds, done=datetime.now() > result_time)
 
 
 @app.route('/', methods=['POST'])
@@ -170,20 +170,30 @@ def guesses():
 
 
 @app.route('/results')
-def display_results():
+def user_results():
     if datetime.now() < result_time:
         flash(f'You have to wait until {humanize.time.naturaltime(result_time)}!', 'error')
         return redirect(url_for('guesses'))
 
+    return display_results()
+
+
+def display_results():
+    """Render the results page"""
+
     # Get the results
     results = get_results()
+
+    # Get the answers as dictionary
+    actual_breeds = get_answer().query('fraction > 0')
+    answer = dict(zip(actual_breeds['breed'], actual_breeds['fraction']))
 
     # Return the results
     breed_ideas = set(results['newbreed'])
     return render_template('results.html',
                            results=results.to_dict('records'),
                            breed_ideas=breed_ideas,
-                           answer=get_answer())
+                           answer=answer)
 
 
 @app.get('/admin')
