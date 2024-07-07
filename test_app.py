@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from io import BytesIO
+import base64
 import json
 
 from pytest import fixture
@@ -104,3 +106,25 @@ def test_results(test_app, perfect_answer):
     page = test_app.get('/results')
     assert page.status_code == 200
     assert 'Ultimate Champ!' in page.get_data(True)
+
+
+def test_admin(test_app, perfect_answer):
+    page = test_app.get('/admin')
+    assert page.status_code == 401
+
+    creds = base64.b64encode(b"admin:admin").decode("utf-8")
+    headers = {'Authorization': f'Basic {creds}'}
+    page = test_app.get('/admin', headers=headers)
+    assert page.status_code == 200
+
+    creds = base64.b64encode(b"admin:admin").decode("utf-8")
+    headers = {'Authorization': f'Basic {creds}'}
+    page = test_app.get('/admin/results', headers=headers)
+    assert page.status_code == 200
+
+    last_mod = app._answer_path.lstat().st_mtime
+    io = BytesIO(app._answer_path.read_bytes())
+    page = test_app.post('/admin', content_type='multipart/form-data', headers=headers,
+                         data={'file': (io, 'example.xlsx')}, follow_redirects=True)
+    assert page.status_code == 200
+    assert app._answer_path.lstat().st_mtime > last_mod

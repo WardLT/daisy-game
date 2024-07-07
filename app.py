@@ -183,15 +183,21 @@ def display_results():
 
     # Get the results
     results = get_results()
+    if results is None:
+        breed_ideas = {}
+        results = []
+    else:
+        breed_ideas = set(results['newbreed'])
+        results = results.to_dict('records')
 
     # Get the answers as dictionary
     actual_breeds = get_answer().query('fraction > 0')
     answer = dict(zip(actual_breeds['breed'], actual_breeds['fraction']))
 
     # Return the results
-    breed_ideas = set(results['newbreed'])
+
     return render_template('results.html',
-                           results=results.to_dict('records'),
+                           results=results,
                            breed_ideas=breed_ideas,
                            answer=answer)
 
@@ -210,6 +216,7 @@ def download_answers():
 
 
 @app.post('/admin')
+@basic_auth.required
 def upload_answers():
     """Receive the uploaded answers"""
 
@@ -240,3 +247,9 @@ def upload_answers():
         # Clear the cache for the answer loader
         get_answer.cache_clear()
         return redirect(url_for('home'))
+
+
+@app.get('/admin/results')
+@basic_auth.required
+def admin_results():
+    return display_results()
