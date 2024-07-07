@@ -24,6 +24,17 @@
     {% endif %}
     {% endwith %}
 
+    {% with messages = get_flashed_messages(category_filter="error") %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-danger" role="alert">
+        {{message}}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+
     <p class="lead">Embark was able to catch the breed(s) of all of Dolly’s ancestors, determining a fraction of Dolly’s
         heritage to each breed. Your task is to guess what those breeds are. Assign a percentage below to guess what
         breeds Dolly is a perfect mix of.</p>

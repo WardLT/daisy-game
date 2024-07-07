@@ -34,11 +34,12 @@ _result_path = Path('results.json')
 
 
 @cache
-def get_answer(path: Path = _answer_path) -> pd.DataFrame():
+def get_answer(path: Optional[Path] = None) -> pd.DataFrame():
     """Load the answer spreadsheet from disk
 
     Adds a breed tag column which
     """
+    path = path or _answer_path
     answers = pd.read_excel(path, usecols=range(3))
 
     # Make breed tags
@@ -52,9 +53,10 @@ def get_answer(path: Path = _answer_path) -> pd.DataFrame():
     return answers
 
 
-def get_results(result_path: Path = _result_path,
-                answer_path: Path = _answer_path) -> Optional[pd.DataFrame]:
+def get_results(result_path: Optional[Path] = None,
+                answer_path: Optional[Path] = None) -> Optional[pd.DataFrame]:
     """Get the latest guesses from contestants"""
+    result_path = result_path or _result_path
     if not Path(result_path).exists():
         return None
 
@@ -65,7 +67,7 @@ def get_results(result_path: Path = _result_path,
 
     # Get the most-recent guess from each person
     results = pd.read_json(result_path, lines=True)
-    results.sort_values(['response_time', 'name'], ascending=True, inplace=True)
+    results.sort_values(['response_time', 'name'], ascending=False, inplace=True)
     results.drop_duplicates('name', keep='first', inplace=True)
 
     # Compute percentages
@@ -143,7 +145,7 @@ def receive():
         flash('You must assign a percentage to at least one breed!', 'error')
         return redirect(url_for('home'))
 
-    with open('results.json', 'a') as fp:
+    with open(_result_path, 'a') as fp:
         print(json.dumps(data), file=fp)
 
     return redirect(url_for('guesses'))
@@ -178,7 +180,10 @@ def display_results():
 
     # Return the results
     breed_ideas = set(results['newbreed'])
-    return render_template('results.html', results=results.to_dict('records'), breed_ideas=breed_ideas, answer=answer)
+    return render_template('results.html',
+                           results=results.to_dict('records'),
+                           breed_ideas=breed_ideas,
+                           answer=get_answer())
 
 
 @app.get('/admin')

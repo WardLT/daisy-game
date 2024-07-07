@@ -53,7 +53,7 @@
         <tr>
             <th scope="row">{{record['name']}}</th>
             {% for breed in breeds %}
-            {% set val = record[breed | replace(" ", "_")] %}
+            {% set val = record[breed | replace(" ", "_") | lower] %}
             {% if val > 1e-6 %}
                 {% if done %}
             <td class="{{ 'table-success' if breed in answer else 'table-danger'}}">{{ "%.1f" | format(val) }}</td>
