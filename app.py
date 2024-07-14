@@ -6,6 +6,7 @@ from typing import Optional
 from functools import cache
 from math import isclose
 import secrets
+import logging
 import shutil
 import json
 
@@ -15,6 +16,9 @@ from flask_basicauth import BasicAuth
 from werkzeug.utils import redirect
 import pandas as pd
 import numpy as np
+
+
+logger = logging.getLogger('main')
 
 # Make the flask app, including a password for the admin page
 app = Flask(__name__)
@@ -40,6 +44,7 @@ def get_answer(path: Optional[Path] = None) -> pd.DataFrame():
     Adds a breed tag column which
     """
     path = path or _answer_path
+    logger.info('Loading answers from disk')
     answers = pd.read_excel(path, usecols=range(3))
 
     # Make breed tags
@@ -253,3 +258,6 @@ def upload_answers():
 @basic_auth.required
 def admin_results():
     return display_results()
+
+
+get_answer()  # Load on start
