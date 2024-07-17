@@ -9,6 +9,9 @@ from pytest import fixture
 import shutil
 import app
 
+creds = base64.b64encode(b"dolly:dolly").decode("utf-8")
+headers = {'Authorization': f'Basic {creds}'}
+
 
 @fixture(autouse=True)
 def test_app(tmpdir):
@@ -57,23 +60,23 @@ def test_load_results(perfect_answer):
 def test_submission_then_update(test_app, perfect_answer):
     """Submit an answer then change it"""
     # Test loading the page
-    page = test_app.get('/')
+    page = test_app.get('/', headers=headers)
     assert page.status_code == 200
 
     # Submit a result
-    page = test_app.post('/', data=perfect_answer, follow_redirects=False)
+    page = test_app.post('/', data=perfect_answer, follow_redirects=False, headers=headers)
     assert page.status_code == 302, page.get_data(as_text=True)
     assert "too late now!" not in page.get_data(as_text=True)
     assert len(app.get_results()) == 1
 
     # Look at the results
-    page = test_app.get('/guesses')
+    page = test_app.get('/guesses', headers=headers)
     assert page.status_code == 200
     assert 'Lady Perfect' in page.get_data(True)
 
     # Submit another answer
     perfect_answer['newbreed'] = 'A worse idea'
-    page = test_app.post('/', data=perfect_answer, follow_redirects=True)
+    page = test_app.post('/', data=perfect_answer, follow_redirects=True, headers=headers)
     assert page.status_code == 200
     assert 'A worse idea' in page.get_data(True)
 
@@ -81,29 +84,29 @@ def test_submission_then_update(test_app, perfect_answer):
 def test_too_late(test_app, perfect_answer):
     app.result_time = datetime.now() - timedelta(minutes=1)
 
-    page = test_app.post('/', data=perfect_answer, follow_redirects=True)
+    page = test_app.post('/', data=perfect_answer, follow_redirects=True, headers=headers)
     assert 'too late' in page.get_data(True)
 
     # Make sure the result isn't on the webpage
-    page = test_app.get('/guesses')
+    page = test_app.get('/guesses', headers=headers)
     assert page.status_code == 200
     assert 'Lady Perfect' not in page.get_data(True)
 
 
 def test_results(test_app, perfect_answer):
-    page = test_app.post('/', data=perfect_answer, follow_redirects=True)
+    page = test_app.post('/', data=perfect_answer, follow_redirects=True, headers=headers)
     assert page.status_code == 200
     assert 'Lady Perfect' in page.get_data(True)
 
     # Make sure the results are not yet visible
-    page = test_app.get('/results', follow_redirects=True)
+    page = test_app.get('/results', follow_redirects=True, headers=headers)
     assert page.status_code == 200
     assert 'The Answers' not in page.get_data(True)
     assert 'You have to wait' in page.get_data(True)
 
     # Increment the time and see if the results button shows up
     app.result_time = datetime.now() - timedelta(minutes=1)
-    page = test_app.get('/results')
+    page = test_app.get('/results', headers=headers)
     assert page.status_code == 200
     assert 'Ultimate Champ!' in page.get_data(True)
 
@@ -117,8 +120,6 @@ def test_admin(test_app, perfect_answer):
     page = test_app.get('/admin', headers=headers)
     assert page.status_code == 200
 
-    creds = base64.b64encode(b"admin:admin").decode("utf-8")
-    headers = {'Authorization': f'Basic {creds}'}
     page = test_app.get('/admin/results', headers=headers)
     assert page.status_code == 200
 

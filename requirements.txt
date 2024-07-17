@@ -1,5 +1,5 @@
 flask
 pandas>2
 humanize
-flask-basicauth
+flask-httpauth
 pytest

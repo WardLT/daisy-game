@@ -11,7 +11,8 @@ import json
 
 import humanize.time
 from flask import Flask, request, render_template, flash, session, send_file, url_for
-from flask_basicauth import BasicAuth
+from flask_httpauth import HTTPBasicAuth
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import redirect
 import pandas as pd
 import numpy as np
@@ -20,9 +21,24 @@ import numpy as np
 app = Flask(__name__)
 app.secret_key = secrets.token_urlsafe(16)
 
-app.config['BASIC_AUTH_USERNAME'] = 'admin'
-app.config['BASIC_AUTH_PASSWORD'] = os.environ.get('DOLLYGAME_PASSWD', 'admin')
-basic_auth = BasicAuth(app)
+auth = HTTPBasicAuth()
+
+users = {
+    "admin": generate_password_hash(os.environ.get('DOLLYGAME_ADMIN_PASSWD', 'admin')),
+    "dolly": generate_password_hash(os.environ.get('DOLLYGAME_USER_PASSWD', 'dolly'))
+}
+
+
+@auth.verify_password
+def verify_password(username, password):
+    if username in users and check_password_hash(users.get(username), password):
+        return username
+
+
+@auth.get_user_roles
+def get_user_roles(user):
+    return ['admin', 'user'] if user == "admin" else 'user'
+
 
 # Randomize the name of the answer download and upload page
 download_page = secrets.token_urlsafe(16) + '.xlsx'
@@ -109,12 +125,14 @@ def get_results(result_path: Optional[Path] = None,
 
 
 @app.route('/', methods=['GET'])
+@auth.login_required(role='user')
 def home():
     breeds = get_answer()['breed'].tolist()
     return render_template('home.html', breeds=breeds, done=datetime.now() > result_time)
 
 
 @app.route('/', methods=['POST'])
+@auth.login_required(role='user')
 def receive():
     answers = get_answer()
 
@@ -152,6 +170,7 @@ def receive():
 
 
 @app.route('/guesses')
+@auth.login_required(role='user')
 def guesses():
     # Get the results and answers
     results = get_results()
@@ -170,6 +189,7 @@ def guesses():
 
 
 @app.route('/results')
+@auth.login_required(role='user')
 def user_results():
     if datetime.now() < result_time:
         flash(f'You have to wait until {humanize.time.naturaltime(result_time)}!', 'error')
@@ -203,20 +223,20 @@ def display_results():
 
 
 @app.get('/admin')
-@basic_auth.required
+@auth.login_required(role='admin')
 def admin():
     """Display the admin page"""
     return render_template('admin.html', download_page=download_page)
 
 
 @app.get(f'/{download_page}')
-@basic_auth.required
+@auth.login_required(role='admin')
 def download_answers():
     return send_file(_answer_path, as_attachment=True, download_name=_answer_path.name)
 
 
 @app.post('/admin')
-@basic_auth.required
+@auth.login_required(role='admin')
 def upload_answers():
     """Receive the uploaded answers"""
 
@@ -250,6 +270,6 @@ def upload_answers():
 
 
 @app.get('/admin/results')
-@basic_auth.required
+@auth.login_required(role='admin')
 def admin_results():
     return display_results()
