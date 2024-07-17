@@ -117,7 +117,7 @@
 
 
         {% for breed in breeds %}
-        {% set tag = breed | replace(' ', '_') -%}
+        {% set tag = breed | replace(' ', '_') | lower -%}
         <div class="col-sm-3">
             <label class="my-1 mr-2">{{breed}}</label>
             <input type="number" class="form-control" name="{{tag}}" id="{{tag}}" min="0" max="100" value="0">
