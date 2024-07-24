@@ -8,6 +8,7 @@ from pytest import fixture
 
 import shutil
 import app
+from app import load_votes
 
 creds = base64.b64encode(b"dolly:dolly").decode("utf-8")
 headers = {'Authorization': f'Basic {creds}'}
@@ -17,6 +18,7 @@ headers = {'Authorization': f'Basic {creds}'}
 def test_app(tmpdir):
     # Point the answers and results to a special folder
     app._result_path = Path(tmpdir) / 'results.json'
+    app._votes_path = Path(tmpdir) / 'votes.csv'
     new_answer_path = Path(tmpdir) / 'answers.xlsx'
     shutil.copy(app._answer_path, new_answer_path)
     app._answer_path = new_answer_path
@@ -109,6 +111,30 @@ def test_results(test_app, perfect_answer):
     page = test_app.get('/results', headers=headers)
     assert page.status_code == 200
     assert 'Ultimate Champ!' in page.get_data(True)
+    assert 'Pick me!' in page.get_data(True)
+
+    # Cast a vote for a nonexistant candidate
+    page = test_app.post('/vote', headers=headers, data={'name': perfect_answer['name'], 'choice': 'Not in'},
+                         follow_redirects=True)
+    assert page.status_code == 200
+    assert 'not in the voting table' in page.get_data(True)
+    assert load_votes() == {}
+
+    # Cast a vote for a real candidate
+    page = test_app.post('/vote', headers=headers,
+                         data={'name': perfect_answer['name'], 'choice': perfect_answer['newbreed']},
+                         follow_redirects=True)
+    assert page.status_code == 200
+    assert load_votes() == {perfect_answer['name']: perfect_answer['newbreed']}
+
+    # Try to cast after the vote time
+    app.result_time -= app.voting_duration
+    page = test_app.post('/vote', headers=headers,
+                         data={'name': perfect_answer['name'], 'choice': perfect_answer['newbreed']},
+                         follow_redirects=True)
+    assert page.status_code == 200
+    assert '<b>Your choice</b>' in page.get_data(True)
+    assert 'The voting period has ended' in page.get_data(True)
 
 
 def test_admin(test_app, perfect_answer):
