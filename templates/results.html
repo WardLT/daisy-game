@@ -20,6 +20,16 @@
 
     <a class="btn btn-primary" href="/guesses" role="button">Back to the guesses</a>
 
+    {% with messages = get_flashed_messages(category_filter=["error"]) %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-danger" role="alert">
+        {{message}}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
     <h2>The Answers</h2>
 
     What you've all been waiting for...
@@ -64,15 +74,26 @@
 
     <h2>New Breed Names</h2>
 
-    <p>Any clever names for Dolly's actual breed? The victor here is crowned by the crowd!</p>
+    <p>Any clever names for Dolly's actual breed? The victor here is crowned by votes during the next week!</p>
+
+    <form action="/vote" method="post">
+
+    {% if vote_active %}
+    <p><input type="text" id="name" name="name" placeholder="Your name" value="{{session['name']}}" required/></p>
+    {% endif %}
 
     <table class="table">
         {% for breed in breed_ideas %}
         <tr>
-            <th scope="row">{{breed}}</th>
+            <th scope="row">
+                {{breed}}
+                {% if your_vote == breed %} <b>Your choice</b> {% endif %}
+                {% if vote_active %} <button class="btn btn-primary" name="choice" type="submit" value="{{breed}}">Pick me!</button>{% endif %}
+            </th>
         </tr>
         {% endfor %}
     </table>
+    </form>
 </main>
 </body>
 </html>

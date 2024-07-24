@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from csv import reader, writer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Optional
@@ -17,7 +18,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import redirect
 import pandas as pd
 import numpy as np
-
 
 logger = logging.getLogger('main')
 
@@ -48,13 +48,15 @@ def get_user_roles(user):
 download_page = secrets.token_urlsafe(16) + '.xlsx'
 
 result_time = datetime(2024, 7, 31, 12, 00, 0)
+voting_duration = timedelta(weeks=1)
 
 _answer_path = Path('answers.xlsx')
 _result_path = Path('results.json')
+_votes_path = Path('votes.csv')
 
 
 @cache
-def get_answer(path: Optional[Path] = None) -> pd.DataFrame():
+def get_answer(path: Optional[Path] = None) -> pd.DataFrame:
     """Load the answer spreadsheet from disk
 
     Adds a breed tag column which
@@ -72,6 +74,28 @@ def get_answer(path: Optional[Path] = None) -> pd.DataFrame():
         raise ValueError(f'The fraction of breeds does not batch up to the correct format')
 
     return answers
+
+
+def load_votes(path: Optional[Path] = None) -> dict[str, str]:
+    """Load the latest vote for each person
+
+    Args:
+        path: Path to the votes file, as a (name, datetime, choice) data frame
+    Returns:
+        Map of user-name to breed vote
+    """
+
+    path = path or _votes_path
+
+    votes = {}
+    if path.exists():
+        with open(path) as fp:
+            for row in reader(fp):
+                if len(row) != 3:
+                    continue
+                name, _, choice = row
+                votes[name] = choice
+    return votes
 
 
 def get_results(result_path: Optional[Path] = None,
@@ -203,6 +227,30 @@ def user_results():
     return display_results()
 
 
+@app.route('/vote', methods=['POST'])
+@auth.login_required(role='user')
+def vote_breed():
+    if datetime.now() < result_time or datetime.now() > result_time + voting_duration:
+        flash('The voting period has ended.', category='error')
+        return redirect(url_for('user_results'))
+
+    # Store the response time
+    data = dict(request.form)
+    data['response_time'] = datetime.now().isoformat()
+
+    results = get_results()
+    if data['choice'] not in set(results['newbreed']):
+        flash(f'{data["choice"]} is not in the voting table', category='error')
+        return redirect(url_for('user_results'))
+
+    # Record the vote
+    session['name'] = data['name']
+    with open(_votes_path, 'a') as fp:
+        w = writer(fp)
+        w.writerow((data['name'], data['response_time'], data['choice']))
+    return redirect(url_for('user_results'))
+
+
 def display_results():
     """Render the results page"""
 
@@ -219,12 +267,19 @@ def display_results():
     actual_breeds = get_answer().query('fraction > 0')
     answer = dict(zip(actual_breeds['breed'], actual_breeds['fraction']))
 
-    # Return the results
+    # Get your vote, if known
+    your_vote = None
+    if 'name' in session:
+        votes = load_votes()
+        your_vote = votes.get(session['name'], None)
 
+    # Return the results
     return render_template('results.html',
                            results=results,
                            breed_ideas=breed_ideas,
-                           answer=answer)
+                           answer=answer,
+                           your_vote=your_vote,
+                           vote_active=datetime.now() < result_time + voting_duration)
 
 
 @app.get('/admin')
