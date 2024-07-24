@@ -47,7 +47,7 @@ def get_user_roles(user):
 # Randomize the name of the answer download and upload page
 download_page = secrets.token_urlsafe(16) + '.xlsx'
 
-result_time = datetime(2024, 7, 31, 12, 00, 0)
+result_time = datetime(2024, 7, 27, 18, 30, 0)
 
 _answer_path = Path('answers.xlsx')
 _result_path = Path('results.json')
