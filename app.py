@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from collections import Counter
 from csv import reader, writer
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -268,10 +269,21 @@ def display_results():
     answer = dict(zip(actual_breeds['breed'], actual_breeds['fraction']))
 
     # Get your vote, if known
+    votes = load_votes()
     your_vote = None
     if 'name' in session:
-        votes = load_votes()
         your_vote = votes.get(session['name'], None)
+
+    # Get if the vote is active
+    vote_active = datetime.now() < result_time + voting_duration
+
+    # If not, collect the votes
+    counts = {}
+    winners = set()
+    if result_time + voting_duration < datetime.now() and datetime.now() > result_time:
+        counts = Counter(votes.values())
+        most_votes = max(counts.values())
+        winners = set(k for k, v in counts.items() if v == most_votes)
 
     # Return the results
     return render_template('results.html',
@@ -279,7 +291,9 @@ def display_results():
                            breed_ideas=breed_ideas,
                            answer=answer,
                            your_vote=your_vote,
-                           vote_active=datetime.now() < result_time + voting_duration)
+                           counts=counts,
+                           winners=winners,
+                           vote_active=vote_active)
 
 
 @app.get('/admin')

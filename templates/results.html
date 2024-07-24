@@ -88,7 +88,11 @@
             <th scope="row">
                 {{breed}}
                 {% if your_vote == breed %} <b>Your choice</b> {% endif %}
-                {% if vote_active %} <button class="btn btn-primary" name="choice" type="submit" value="{{breed}}">Pick me!</button>{% endif %}
+                {% if vote_active %}
+                <button class="btn btn-primary" name="choice" type="submit" value="{{breed}}">Pick me!</button>
+                {% else %}
+                {% if breed in winners %} 👑 {% endif %} ({{counts.get(breed, 0)}})
+                {% endif %}
             </th>
         </tr>
         {% endfor %}

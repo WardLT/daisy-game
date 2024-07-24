@@ -135,6 +135,7 @@ def test_results(test_app, perfect_answer):
     assert page.status_code == 200
     assert '<b>Your choice</b>' in page.get_data(True)
     assert 'The voting period has ended' in page.get_data(True)
+    assert '👑  (1)' in page.get_data(True)
 
 
 def test_admin(test_app, perfect_answer):
